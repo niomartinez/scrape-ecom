@@ -253,7 +253,7 @@ function setupResetSheet() {
   }
   
   // Add some sample data and formulas
-  sheet.getRange('A5').setValue('B09G9FPGTN'); // Sample ASIN
+  sheet.getRange('A5').setValue('B0CRDCXRK2'); // Sample ASIN - ASUS RTX 5070 Ti (known working)
   sheet.getRange('B5').setValue('=CONCATENATE("https://", B$2, "/dp/", A5)'); // Dynamic URL formula
   
   // // Add instructions
@@ -339,63 +339,47 @@ function SCRAPE(url, selectors_range) {
     return [["❌ Error: API key not set. Use SheetScrape > Account > Set API Key"]];
   }
 
-  // Prepare the request payload
-  const payload = {
-    'url': url,
-    'selectors': selectors
-  };
-
-  const options = {
-    'method': 'POST',
-    'contentType': 'application/json',
-    'headers': {
-      'x-api-key': apiKey,
-      'User-Agent': 'SheetScrape/1.0 Google-Apps-Script'
-    },
-    'payload': JSON.stringify(payload),
-    'muteHttpExceptions': true // Important: allows us to handle errors gracefully
-  };
-
   try {
-    // Make the API call
-    const response = UrlFetchApp.fetch(API_URL, options);
-    const responseCode = response.getResponseCode();
-    const responseBody = response.getContentText();
+    // Make the API request with reduced timeout
+    const response = UrlFetchApp.fetch(API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey
+      },
+      payload: JSON.stringify({
+        url: url,
+        selectors: selectors,
+        marketplace: 'Amazon.com'
+      }),
+      muteHttpExceptions: true,
+      timeout: 120000  // Reduced to 2 minutes instead of default 6 minutes
+    });
     
-    // Parse the JSON response
-    let jsonResponse;
-    try {
-      jsonResponse = JSON.parse(responseBody);
-    } catch (parseError) {
-      const errorRow = ["❌ Parse Error: Invalid response from server"].concat(new Array(selectors.length - 1).fill(""));
-      return [errorRow];
+    if (response.getResponseCode() !== 200) {
+      throw new Error(`API Error: ${response.getResponseCode()} - ${response.getContentText()}`);
     }
-
-    if (responseCode === 200) {
-      // Success! Return the scraped data
-      return jsonResponse.data || [["❌ No data returned"]];
+    
+    const data = JSON.parse(response.getContentText());
+    
+    if (!data.data || !Array.isArray(data.data) || data.data.length === 0) {
+      throw new Error('Invalid response format from API');
+    }
+    
+    // Return the data array for spilling
+    return data.data;
+    
+  } catch (error) {
+    console.error('SCRAPE function error:', error);
+    
+    // Return a more helpful error message
+    if (error.message.includes('timeout') || error.message.includes('Timeout')) {
+      return [['API_TIMEOUT - Try fewer selectors or check API status']];
+    } else if (error.message.includes('DNS')) {
+      return [['DNS_ERROR - Check API URL configuration']];
     } else {
-      // Handle API errors with specific error messages
-      let errorMessage = "❌ API Error";
-      if (jsonResponse && jsonResponse.detail) {
-        errorMessage += `: ${jsonResponse.detail}`;
-      } else {
-        errorMessage += `: HTTP ${responseCode}`;
-      }
-      
-      const errorRow = [errorMessage].concat(new Array(selectors.length - 1).fill(""));
-      return [errorRow];
+      return [[`ERROR: ${error.message}`]];
     }
-    
-  } catch (networkError) {
-    // Handle network errors (server down, connection issues, etc.)
-    let errorMessage = "❌ Network Error";
-    if (networkError.message) {
-      errorMessage += `: ${networkError.message}`;
-    }
-    
-    const errorRow = [errorMessage].concat(new Array(selectors.length - 1).fill(""));
-    return [errorRow];
   }
 }
 
@@ -433,4 +417,18 @@ function columnToLetter(column) {
     column = (column - temp - 1) / 26;
   }
   return letter;
+}
+
+/**
+ * Basic scraping function with essential selectors only (faster, less likely to timeout)
+ * 
+ * @param {string} url - The URL to scrape
+ * @return {Array} Array of scraped data for essential fields
+ * @customfunction
+ */
+function SCRAPE_BASIC(url) {
+  // Essential selectors only
+  const basicSelectors = ['title', 'sale_price', 'rating', 'review_count', 'availability', 'brand_name'];
+  
+  return SCRAPE(url, basicSelectors);
 } 
