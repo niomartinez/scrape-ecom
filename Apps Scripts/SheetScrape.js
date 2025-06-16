@@ -220,7 +220,7 @@ function setupResetSheet() {
     .setFontWeight('bold').setBackground('#f0f0f0');
 
   // Set up D5 with formula =SCRAPE($B5, $D$4:$BZ$4)
-  sheet.getRange('D5').setValue('=SCRAPE($B5, $D$4:$BZ4)');
+  sheet.getRange('D5').setValue('=SCRAPE($B5, $D$4:$CA$4)');
   
   // Set up E4 with bullet_point_1 default
   sheet.getRange('E4').setDataValidation(selectorRule).setValue('bullet_point_1')
@@ -270,7 +270,7 @@ function setupResetSheet() {
   // // Style the instructions
   // sheet.getRange('A6:A10').setFontStyle('italic').setBackground('#fff2cc');
   
-  ui.alert('✅ Success!', 'Sheet has been set up with the ideal SheetScrape layout. Check the instructions in column A.', ui.ButtonSet.OK);
+  ui.alert('✅ Success!', 'Sheet has been set up with the ideal SheetScrape layout.', ui.ButtonSet.OK);
 }
 
 

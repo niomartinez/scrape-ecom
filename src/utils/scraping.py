@@ -43,17 +43,28 @@ def simple_scrape(url: str, headers: Optional[Dict[str, str]] = None) -> Beautif
     try:
         if not headers:
             headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) '
-                             'Chrome/91.0.4472.124 Safari/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-                'Accept-Language': 'en-US,en;q=0.5',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'DNT': '1',
                 'Connection': 'keep-alive',
                 'Upgrade-Insecure-Requests': '1',
+                'Sec-Fetch-Dest': 'document',
+                'Sec-Fetch-Mode': 'navigate',
+                'Sec-Fetch-Site': 'none',
+                'Sec-Fetch-User': '?1',
                 'Cache-Control': 'max-age=0'
             }
         
+        # Add a small delay to avoid being too aggressive
+        time.sleep(1)
+        
         response = requests.get(url, headers=headers, timeout=30)
         response.raise_for_status()
+        
+        logger.info(f"Simple scraping got {len(response.text)} characters")
+        
         soup = BeautifulSoup(response.text, 'html.parser')
         return soup
     except requests.RequestException as e:
@@ -81,37 +92,84 @@ async def advanced_scrape(url: str, wait_for_selector: str = 'body', timeout: in
     """
     try:
         async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True)
+            # Use more realistic browser settings
+            browser = await p.chromium.launch(
+                headless=True,
+                args=[
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--disable-accelerated-2d-canvas',
+                    '--no-first-run',
+                    '--no-zygote',
+                    '--disable-gpu',
+                    '--disable-web-security',
+                    '--disable-features=VizDisplayCompositor'
+                ]
+            )
+            
+            # Create context with realistic settings
             context = await browser.new_context(
                 viewport={"width": 1920, "height": 1080},
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
-                          "Chrome/91.0.4472.124 Safari/537.36"
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                extra_http_headers={
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+                    'Accept-Language': 'en-US,en;q=0.9',
+                    'Accept-Encoding': 'gzip, deflate, br',
+                    'DNT': '1',
+                    'Connection': 'keep-alive',
+                    'Upgrade-Insecure-Requests': '1',
+                    'Sec-Fetch-Dest': 'document',
+                    'Sec-Fetch-Mode': 'navigate',
+                    'Sec-Fetch-Site': 'none',
+                    'Sec-Fetch-User': '?1',
+                    'Cache-Control': 'max-age=0'
+                }
             )
+            
             page = await context.new_page()
+            
+            # Add random delay to seem more human
+            await asyncio.sleep(1 + (hash(url) % 3))
             
             # Navigate to URL with a more lenient loading strategy
             try:
                 # First try with networkidle but with a shorter timeout
-                await page.goto(url, wait_until="networkidle", timeout=15000)
+                await page.goto(url, wait_until="networkidle", timeout=20000)
             except Exception as e:
                 logger.warning(f"networkidle timeout, falling back to domcontentloaded: {e}")
                 # If that fails, try with domcontentloaded
                 await page.goto(url, wait_until="domcontentloaded", timeout=timeout)
             
-            # Try to wait for the selector, but continue if it times out
+            # Wait for page to be interactive
+            await page.wait_for_load_state("domcontentloaded")
+            
+            # Add longer delay for dynamic content
+            await asyncio.sleep(3)
+            
+            # Try to wait for common Amazon elements
             try:
-                await page.wait_for_selector(wait_for_selector, timeout=10000)
+                await page.wait_for_selector('#productTitle, #landingImage, #feature-bullets', timeout=10000)
             except Exception as e:
-                logger.warning(f"Selector wait timed out, continuing anyway: {e}")
+                logger.warning(f"Product elements wait timed out, continuing anyway: {e}")
             
-            # Add a small delay for dynamic content
-            await asyncio.sleep(2)
-            
-            # Scroll to load lazy content
+            # Simulate human-like scrolling behavior
             try:
+                # Scroll down slowly
+                for i in range(3):
+                    await page.evaluate(f"window.scrollTo(0, {(i + 1) * 300})")
+                    await asyncio.sleep(0.5)
+                
+                # Scroll to middle
                 await page.evaluate("window.scrollTo(0, document.body.scrollHeight / 2)")
                 await asyncio.sleep(1)
+                
+                # Scroll to bottom
                 await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                await asyncio.sleep(1)
+                
+                # Scroll back to top
+                await page.evaluate("window.scrollTo(0, 0)")
                 await asyncio.sleep(1)
             except Exception as e:
                 logger.warning(f"Scrolling error, continuing anyway: {e}")
@@ -119,6 +177,12 @@ async def advanced_scrape(url: str, wait_for_selector: str = 'body', timeout: in
             # Get HTML content
             content = await page.content()
             await browser.close()
+            
+            logger.info(f"Final HTML content length: {len(content)} characters")
+            
+            # Check if we got a meaningful page
+            if len(content) < 10000:
+                logger.warning(f"Suspiciously short HTML content ({len(content)} chars), might be blocked")
             
             return content
     except Exception as e:
@@ -285,7 +349,32 @@ async def choose_scraping_method(url: str) -> str:
     """
     if is_javascript_heavy(url):
         logger.info(f"Using advanced Playwright scraping for {url}")
-        return await advanced_scrape(url)
+        try:
+            playwright_content = await advanced_scrape(url)
+            
+            # If Playwright returns very little content, try simple scraping as fallback
+            if len(playwright_content) < 10000:
+                logger.warning(f"Playwright returned minimal content ({len(playwright_content)} chars), trying simple scraping as fallback")
+                try:
+                    soup = simple_scrape(url)
+                    simple_content = str(soup)
+                    
+                    # Use whichever method returned more content
+                    if len(simple_content) > len(playwright_content):
+                        logger.info(f"Simple scraping returned more content ({len(simple_content)} vs {len(playwright_content)} chars), using simple method")
+                        return simple_content
+                    else:
+                        logger.info(f"Playwright content is still better ({len(playwright_content)} vs {len(simple_content)} chars), using Playwright")
+                        return playwright_content
+                except Exception as e:
+                    logger.warning(f"Simple scraping fallback failed: {e}, using Playwright result")
+                    return playwright_content
+            
+            return playwright_content
+        except Exception as e:
+            logger.error(f"Playwright scraping failed: {e}, falling back to simple scraping")
+            soup = simple_scrape(url)
+            return str(soup)
     else:
         logger.info(f"Using simple requests scraping for {url}")
         soup = simple_scrape(url)
