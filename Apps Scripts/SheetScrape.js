@@ -4,10 +4,7 @@
 // Version: 1.0
 
 // --- Configuration ---
-// This should point to your backend API. Use your local URL for testing.
-// When you deploy, change this to your live server URL.
-// For Render deployment, use: https://your-service-name.onrender.com/scrape
-const API_URL = "https://sheetscrape-api.onrender.com/scrape";  // Update this with your actual Render URL
+const API_URL = "https://sheetscrape-api.onrender.com/scrape"; 
 
 // Define the standard header order that matches our backend selectors (28 columns + 1 blank)
 const STANDARD_HEADERS = [
@@ -236,7 +233,7 @@ function setupResetSheet() {
   sheet.getRange('A4').setValue('ASINs').setFontWeight('bold').setBackground('#f0f0f0');
   sheet.getRange('B4').setValue('URLs').setFontWeight('bold').setBackground('#f0f0f0');
   
-  // Create selector dropdown rule
+  // Create selector dropdown rule with enhanced styling
   const selectorRule = SpreadsheetApp.newDataValidation()
     .requireValueInList(ALL_SELECTORS)
     .setAllowInvalid(false)
@@ -252,16 +249,49 @@ function setupResetSheet() {
   const headerRange = sheet.getRange(4, 4, 1, STANDARD_HEADERS.length);
   headerRange.setValues([STANDARD_HEADERS]);
   
-  // Format headers
+  // Format headers with enhanced styling
   headerRange.setFontWeight('bold');
   headerRange.setBackground('#E8F0FE');
   headerRange.setBorder(true, true, true, true, true, true);
+  headerRange.setHorizontalAlignment('center');
+  headerRange.setVerticalAlignment('middle');
   
-  // Add data validation to header cells so users can change them
+  // Set column widths for data columns (D onwards) - approximately 2.5 inches
+  const startColumn = 4; // Column D
+  for (let i = 0; i < STANDARD_HEADERS.length; i++) {
+    sheet.setColumnWidth(startColumn + i, 180); // ~2.5 inches in pixels
+  }
+  
+  // Set row height for header row (approximately 1 inch)
+  sheet.setRowHeight(4, 72);
+  
+  // Freeze rows 1-4 to keep headers visible
+  sheet.setFrozenRows(4);
+  
+  // Add data validation to header cells with enhanced dropdown styling
   for (let i = 0; i < STANDARD_HEADERS.length; i++) {
     const cell = sheet.getRange(4, 4 + i);
     cell.setDataValidation(selectorRule);
+    
+    // Add card-like appearance with enhanced styling
+    cell.setBorder(true, true, true, true, true, true, '#4285F4', SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
+    cell.setBackground('#F8F9FA'); // Slightly different background for card effect
+    cell.setFontColor('#1A73E8'); // Blue text color for better contrast
+    cell.setFontSize(10); // Slightly smaller font for better fit
   }
+  
+  // Pre-format data area (rows 5 and beyond) for better text handling
+  const dataStartRow = 5;
+  const dataRows = 100; // Format first 100 rows for future data
+  const dataRange = sheet.getRange(dataStartRow, startColumn, dataRows, STANDARD_HEADERS.length);
+  
+  // Set data cell formatting
+  dataRange.setWrap(true); // Enable text wrapping
+  dataRange.setHorizontalAlignment('left'); // Left-align text content as requested
+  dataRange.setVerticalAlignment('top'); // Align to top for better readability
+  
+  // Set a subtle border for data cells
+  dataRange.setBorder(true, true, true, true, true, true, '#E0E0E0', SpreadsheetApp.BorderStyle.SOLID_THIN);
   
   // Add some sample data and formulas
   sheet.getRange('A5').setValue('B0CRDCXRK2'); // Sample ASIN - ASUS RTX 5070 Ti (known working)
@@ -271,9 +301,15 @@ function setupResetSheet() {
   const lastColumn = columnToLetter(4 + STANDARD_HEADERS.length - 1);
   sheet.getRange('D5').setValue(`=SCRAPE_BASIC($B5)`);
   
-  // Format the sample data
+  // Format the sample data with enhanced styling
   sheet.getRange('A5:B5').setBorder(true, true, true, true, true, true);
   sheet.getRange('D5').setBorder(true, true, true, true, true, true);
+  
+  // Format A and B columns for better appearance
+  sheet.getRange('A4:B4').setHorizontalAlignment('center');
+  sheet.getRange('A4:B4').setVerticalAlignment('middle');
+  sheet.setColumnWidth(1, 120); // ASIN column width
+  sheet.setColumnWidth(2, 200); // URL column width
   
   ui.alert('✅ Success!', 'Sheet has been set up with the ideal SheetScrape layout.', ui.ButtonSet.OK);
 }
