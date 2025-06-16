@@ -150,43 +150,42 @@ async def scrape_url(request: ScrapeRequest):
         cache_key = f"sheetscrape:{url}:{','.join(selectors)}:{marketplace}"
         cached_data = redis_client.get(cache_key)
         if cached_data:
-            logger.info(f"Cache hit for URL: {url}")
-            return json.loads(cached_data)
+            logger.info(f"Returning cached data for {url}")
+            try:
+                cached_result = json.loads(cached_data)
+                return {"data": cached_result}
+            except json.JSONDecodeError:
+                logger.warning("Failed to parse cached data, proceeding with fresh scrape")
     
+    # Scrape the URL
     try:
-        # Choose scraping method based on URL
         html_content = await choose_scraping_method(url)
         logger.info(f"Successfully scraped HTML content, length: {len(html_content)} characters")
-        
-        # Get selectors map for this domain (currently optimized for Amazon)
-        domain_selectors = get_selectors_for_domain(url, marketplace)
-        
-        if not domain_selectors:
-            raise HTTPException(status_code=400, detail="Domain not supported")
-        
-        logger.info(f"Using {len(domain_selectors)} available selectors for domain")
-        
-        # Extract only the requested selectors in the order specified
-        results = extract_specific_selectors(html_content, selectors, domain_selectors)
-        logger.info(f"Extraction results: {results}")
-        
-        # Format response as expected by Google Sheets
-        response = {"data": [results]}
-        
-        # Cache the result if Redis is available
-        if redis_client:
-            cache_key = f"sheetscrape:{url}:{','.join(selectors)}:{marketplace}"
-            # Cache for 24 hours
-            redis_client.setex(cache_key, 86400, json.dumps(response))
-        
-        logger.info(f"Returning response: {response}")
-        return response
-    except ScrapingError as e:
-        logger.error(f"Scraping error for URL {url}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
-        logger.error(f"Unexpected error processing URL {url}: {e}")
-        raise HTTPException(status_code=500, detail=f"Error processing request: {e}")
+        logger.error(f"Failed to scrape {url}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Scraping failed: {str(e)}")
+    
+    # Get selectors for the domain
+    domain_selectors = get_selectors_for_domain(url, marketplace)
+    logger.info(f"Using {len(domain_selectors)} available selectors for domain")
+    
+    # Extract the requested data
+    extracted_data = extract_specific_selectors(html_content, selectors, domain_selectors)
+    logger.info(f"Extraction results: {[item[:50] + '...' if len(str(item)) > 50 else item for item in extracted_data]}")
+    
+    # Prepare response data as a 2D array for Google Sheets spilling
+    response_data = [extracted_data]
+    
+    # Cache the result if Redis is available (cache for 6 hours instead of 24)
+    if redis_client:
+        try:
+            redis_client.setex(cache_key, 21600, json.dumps(response_data))  # 6 hours cache
+            logger.info(f"Cached result for {url}")
+        except Exception as e:
+            logger.warning(f"Failed to cache result: {str(e)}")
+    
+    logger.info(f"Returning response: {{'data': {[item[:30] + '...' if len(str(item)) > 30 else item for item in response_data[0]]}}}")
+    return {"data": response_data}
 
 if __name__ == "__main__":
     import uvicorn
