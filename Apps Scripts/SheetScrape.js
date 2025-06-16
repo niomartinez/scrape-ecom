@@ -9,7 +9,7 @@
 // For Render deployment, use: https://your-service-name.onrender.com/scrape
 const API_URL = "https://sheetscrape-api.onrender.com/scrape";  // Update this with your actual Render URL
 
-// Define the standard header order that matches our backend selectors
+// Define the standard header order that matches our backend selectors (28 columns + 1 blank)
 const STANDARD_HEADERS = [
   'title',
   'bullet_point_1', 
@@ -38,21 +38,7 @@ const STANDARD_HEADERS = [
   'image_5_source',
   'image_6_source',
   'has_video',
-  'sale_price',
-  'list_price',
-  'rating',
-  'review_count',
-  'manufacturer',
-  'model',
-  'url',
-  'featured_image_source',
-  'other_images_source',
-  'categories_links',
-  'item_weight',
-  'package_dimensions',
-  'has_deal',
-  'has_coupon',
-  'coupon_value'
+  '' // 1 blank column as requested
 ];
 
 /**
@@ -175,9 +161,10 @@ function setupResetSheet() {
     .setHelpText('Choose data point to scrape')
     .build();
   
-  // Set up C4 with just "Image" by default and has the formula on C5 as =IF(AM5<>"", IMAGE(AM5), "")
+  // Set up C4 with just "Image" by default and has the formula on C5 as =IF(image_1_source<>"", IMAGE(image_1_source), "")
   sheet.getRange('C4').setValue('image').setFontWeight('bold').setBackground('#f0f0f0');
-  sheet.getRange('C5').setValue('=IF(Y5<>"", IMAGE(Y5), "")'); // Updated to match image_1_source position
+  // image_1_source is at position 21 in STANDARD_HEADERS (0-based), so column D=4, so image_1_source = column 4+20 = column X (24)
+  sheet.getRange('C5').setValue('=IF(X5<>"", IMAGE(X5), "")');
   
   // Add headers starting from column D (column 4) using STANDARD_HEADERS
   const headerRange = sheet.getRange(4, 4, 1, STANDARD_HEADERS.length);
@@ -377,8 +364,8 @@ function columnToLetter(column) {
  * @customfunction
  */
 function SCRAPE_BASIC(url) {
-  // Essential selectors only (6 fields for maximum speed) - in standard order
-  const basicSelectors = ['title', 'sale_price', 'rating', 'availability', 'brand_name', 'asin'];
+  // Essential selectors only (6 fields for maximum speed) - from our 28-column list
+  const basicSelectors = ['title', 'availability', 'brand_name', 'asin', 'categories', 'image_1_source'];
   
   return SCRAPE(url, [basicSelectors]);
 }
@@ -391,11 +378,11 @@ function SCRAPE_BASIC(url) {
  * @customfunction
  */
 function SCRAPE_MEDIUM(url) {
-  // Important selectors (15 fields - good balance of data vs speed) - in standard order
+  // Important selectors (15 fields - good balance of data vs speed) - from our 28-column list
   const mediumSelectors = [
     'title', 'bullet_point_1', 'bullet_point_2', 'description', 'availability',
-    'brand_name', 'asin', 'categories', 'image_1_source', 'sale_price', 
-    'list_price', 'rating', 'review_count', 'manufacturer', 'url'
+    'brand_name', 'asin', 'categories', 'image_1_source', 'image_2_source', 
+    'image_3_source', 'has_video', 'buybox_winner', 'times_evaluated', 'variations_asins'
   ];
   
   return SCRAPE(url, [mediumSelectors]);
