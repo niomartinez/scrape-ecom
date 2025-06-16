@@ -346,10 +346,10 @@ function SCRAPE(url, selectors_range) {
     return [["❌ Error: No valid selectors found in range"]];
   }
 
-  // Limit selectors to prevent timeout (max 20 for speed)
-  if (selectors.length > 20) {
-    console.warn(`Too many selectors (${selectors.length}), limiting to first 20 to prevent timeout`);
-    selectors = selectors.slice(0, 20);
+  // Limit selectors to prevent timeout (max 30 for full coverage of standard headers)
+  if (selectors.length > 30) {
+    console.warn(`Too many selectors (${selectors.length}), limiting to first 30 to prevent timeout`);
+    selectors = selectors.slice(0, 30);
   }
 
   try {
@@ -440,35 +440,94 @@ function columnToLetter(column) {
 
 /**
  * Fast scraping function with essential selectors only (optimized for 30-second limit)
- * Returns: Title -> BP1-5, Description, Image 1 (8 fields)
+ * Returns data in STANDARD_HEADERS order: Title -> BP1-5, Description, Image 1 (8 fields)
  * 
  * @param {string} url - The URL to scrape
  * @return {Array} Array of scraped data for essential fields only
  * @customfunction
  */
 function SCRAPE_BASIC(url) {
-  // Essential selectors: Title -> BP1-5, Description, Image 1 (8 fields)
+  // Get the essential data using SCRAPE
   const basicSelectors = ['title', 'bullet_point_1', 'bullet_point_2', 'bullet_point_3', 'bullet_point_4', 'bullet_point_5', 'description', 'image_1_source'];
+  const result = SCRAPE(url, [basicSelectors]);
   
-  return SCRAPE(url, [basicSelectors]);
+  if (!result || !Array.isArray(result) || result.length === 0) {
+    return result; // Return error as-is
+  }
+  
+  // Map the result to match STANDARD_HEADERS order (28 columns + 1 blank)
+  const mappedResult = new Array(STANDARD_HEADERS.length).fill('');
+  const data = result[0]; // SCRAPE returns array of arrays
+  
+  // Map each piece of data to its correct position in STANDARD_HEADERS
+  const mapping = {
+    0: 0,   // title -> title (position 0)
+    1: 1,   // bullet_point_1 -> bullet_point_1 (position 1)
+    2: 2,   // bullet_point_2 -> bullet_point_2 (position 2)
+    3: 3,   // bullet_point_3 -> bullet_point_3 (position 3)
+    4: 4,   // bullet_point_4 -> bullet_point_4 (position 4)
+    5: 5,   // bullet_point_5 -> bullet_point_5 (position 5)
+    6: 7,   // description -> description (position 7)
+    7: 20   // image_1_source -> image_1_source (position 20)
+  };
+  
+  for (let i = 0; i < data.length; i++) {
+    if (mapping[i] !== undefined) {
+      mappedResult[mapping[i]] = data[i];
+    }
+  }
+  
+  return [mappedResult];
 }
 
 /**
  * Medium scraping function with important selectors (optimized for 30-second limit)
- * Returns: Title, BP1-6, Description, Image 1-5 (13 fields)
+ * Returns data in STANDARD_HEADERS order: Title, BP1-6, Description, Image 1-5 (13 fields)
  * 
  * @param {string} url - The URL to scrape
  * @return {Array} Array of scraped data for important fields
  * @customfunction
  */
 function SCRAPE_MEDIUM(url) {
-  // Medium selectors: Title, BP1-6, Description, Image 1-5 (13 fields)
+  // Get the medium data using SCRAPE
   const mediumSelectors = [
     'title', 'bullet_point_1', 'bullet_point_2', 'bullet_point_3', 'bullet_point_4', 'bullet_point_5', 'bullet_point_6',
     'description', 'image_1_source', 'image_2_source', 'image_3_source', 'image_4_source', 'image_5_source'
   ];
+  const result = SCRAPE(url, [mediumSelectors]);
   
-  return SCRAPE(url, [mediumSelectors]);
+  if (!result || !Array.isArray(result) || result.length === 0) {
+    return result; // Return error as-is
+  }
+  
+  // Map the result to match STANDARD_HEADERS order (28 columns + 1 blank)
+  const mappedResult = new Array(STANDARD_HEADERS.length).fill('');
+  const data = result[0]; // SCRAPE returns array of arrays
+  
+  // Map each piece of data to its correct position in STANDARD_HEADERS
+  const mapping = {
+    0: 0,   // title -> title (position 0)
+    1: 1,   // bullet_point_1 -> bullet_point_1 (position 1)
+    2: 2,   // bullet_point_2 -> bullet_point_2 (position 2)
+    3: 3,   // bullet_point_3 -> bullet_point_3 (position 3)
+    4: 4,   // bullet_point_4 -> bullet_point_4 (position 4)
+    5: 5,   // bullet_point_5 -> bullet_point_5 (position 5)
+    6: 6,   // bullet_point_6 -> bullet_point_6 (position 6) - NEW for medium
+    7: 7,   // description -> description (position 7)
+    8: 20,  // image_1_source -> image_1_source (position 20)
+    9: 21,  // image_2_source -> image_2_source (position 21)
+    10: 22, // image_3_source -> image_3_source (position 22)
+    11: 23, // image_4_source -> image_4_source (position 23)
+    12: 24  // image_5_source -> image_5_source (position 24)
+  };
+  
+  for (let i = 0; i < data.length; i++) {
+    if (mapping[i] !== undefined) {
+      mappedResult[mapping[i]] = data[i];
+    }
+  }
+  
+  return [mappedResult];
 }
 
 /**
