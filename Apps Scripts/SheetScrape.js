@@ -133,6 +133,7 @@ function onOpen() {
       .addItem('View Account Info', 'showAccountInfo'))
     .addSeparator()
     .addItem('Setup/Reset Sheet', 'setupResetSheet')
+    .addItem('Reset Headers to Standard', 'resetToStandardHeaders')
     .addSeparator()
     .addItem('Help & Documentation', 'showHelp')
     .addToUi();
@@ -268,7 +269,7 @@ function setupResetSheet() {
   
   // Add sample SCRAPE formula using the new headers
   const lastColumn = columnToLetter(4 + STANDARD_HEADERS.length - 1);
-  sheet.getRange('D5').setValue(`=SCRAPE($B5, $D$4:$${lastColumn}$4)`);
+  sheet.getRange('D5').setValue(`=SCRAPE_BASIC($B5)`);
   
   // Format the sample data
   sheet.getRange('A5:B5').setBorder(true, true, true, true, true, true);
@@ -438,31 +439,14 @@ function columnToLetter(column) {
 }
 
 /**
- * Helper function to reset headers to default STANDARD_HEADERS
- */
-function resetHeadersToDefault() {
-  const sheet = SpreadsheetApp.getActiveSheet();
-  
-  // Reset headers starting from column D (column 4) using STANDARD_HEADERS
-  const headerRange = sheet.getRange(4, 4, 1, STANDARD_HEADERS.length);
-  headerRange.setValues([STANDARD_HEADERS]);
-  
-  // Update the image formula to match the correct position
-  sheet.getRange('C5').setValue('=IF(X5<>"", IMAGE(X5), "")');
-}
-
-/**
  * Fast scraping function with essential selectors only (optimized for 30-second limit)
- * Resets headers to default before running: Title -> BP1-5, Description, Image 1
+ * Returns: Title -> BP1-5, Description, Image 1 (8 fields)
  * 
  * @param {string} url - The URL to scrape
  * @return {Array} Array of scraped data for essential fields only
  * @customfunction
  */
 function SCRAPE_BASIC(url) {
-  // Reset headers to default first
-  resetHeadersToDefault();
-  
   // Essential selectors: Title -> BP1-5, Description, Image 1 (8 fields)
   const basicSelectors = ['title', 'bullet_point_1', 'bullet_point_2', 'bullet_point_3', 'bullet_point_4', 'bullet_point_5', 'description', 'image_1_source'];
   
@@ -471,16 +455,13 @@ function SCRAPE_BASIC(url) {
 
 /**
  * Medium scraping function with important selectors (optimized for 30-second limit)
- * Resets headers to default before running: Title, BP1-6, Description, Image 1-5
+ * Returns: Title, BP1-6, Description, Image 1-5 (13 fields)
  * 
  * @param {string} url - The URL to scrape
  * @return {Array} Array of scraped data for important fields
  * @customfunction
  */
 function SCRAPE_MEDIUM(url) {
-  // Reset headers to default first
-  resetHeadersToDefault();
-  
   // Medium selectors: Title, BP1-6, Description, Image 1-5 (13 fields)
   const mediumSelectors = [
     'title', 'bullet_point_1', 'bullet_point_2', 'bullet_point_3', 'bullet_point_4', 'bullet_point_5', 'bullet_point_6',
@@ -488,4 +469,21 @@ function SCRAPE_MEDIUM(url) {
   ];
   
   return SCRAPE(url, [mediumSelectors]);
+}
+
+/**
+ * Manually reset headers to the standard 28-column layout
+ * Call this function manually if you want to reset headers after customizing them
+ */
+function resetToStandardHeaders() {
+  const sheet = SpreadsheetApp.getActiveSheet();
+  
+  // Reset headers starting from column D (column 4) using STANDARD_HEADERS
+  const headerRange = sheet.getRange(4, 4, 1, STANDARD_HEADERS.length);
+  headerRange.setValues([STANDARD_HEADERS]);
+  
+  // Update the image formula to match the correct position
+  sheet.getRange('C5').setValue('=IF(X5<>"", IMAGE(X5), "")');
+  
+  SpreadsheetApp.getUi().alert('Headers reset to standard layout!');
 } 
