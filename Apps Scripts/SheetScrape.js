@@ -319,28 +319,38 @@ function SCRAPE(url, selectors_range) {
     return [["❌ Error: URL and selector range are required"]];
   }
 
-  // Handle single cell or array input for selectors
-  let selectors;
+  // Get API key from script properties
+  const apiKey = PropertiesService.getScriptProperties().getProperty('API_KEY');
+  if (!apiKey) {
+    return [["❌ Error: API key not configured. Run Setup/Reset from menu."]];
+  }
+
+  // Convert range to array and extract non-empty selectors
+  let selectors = [];
   if (Array.isArray(selectors_range)) {
-    // If it's a 2D array (range), flatten the first row and filter out empty values
-    selectors = selectors_range[0].filter(s => s !== "" && s !== null && s !== undefined);
+    if (selectors_range.length === 1 && Array.isArray(selectors_range[0])) {
+      // Handle 2D array (single row)
+      selectors = selectors_range[0].filter(cell => cell && cell.toString().trim() !== '');
+    } else {
+      // Handle 1D array
+      selectors = selectors_range.filter(cell => cell && cell.toString().trim() !== '');
+    }
   } else {
-    // If it's a single value, convert to array
-    selectors = [selectors_range].filter(s => s !== "" && s !== null && s !== undefined);
+    return [["❌ Error: Invalid selector range format"]];
   }
 
   if (selectors.length === 0) {
-    return [["❌ Error: No valid selectors provided"]];
+    return [["❌ Error: No valid selectors found in range"]];
   }
-  
-  // Retrieve the stored API key
-  const apiKey = PropertiesService.getDocumentProperties().getProperty('SHEETSCRAPE_API_KEY');
-  if (!apiKey) {
-    return [["❌ Error: API key not set. Use SheetScrape > Account > Set API Key"]];
+
+  // Limit selectors to prevent timeout (max 20 for speed)
+  if (selectors.length > 20) {
+    console.warn(`Too many selectors (${selectors.length}), limiting to first 20 to prevent timeout`);
+    selectors = selectors.slice(0, 20);
   }
 
   try {
-    // Make the API request with reduced timeout
+    // Make the API request with aggressive timeout settings
     const response = UrlFetchApp.fetch(API_URL, {
       method: 'POST',
       headers: {
@@ -353,17 +363,20 @@ function SCRAPE(url, selectors_range) {
         marketplace: 'Amazon.com'
       }),
       muteHttpExceptions: true,
-      timeout: 120000  // Reduced to 2 minutes instead of default 6 minutes
+      timeout: 25000  // 25 seconds max (leave 5 seconds buffer for processing)
     });
     
     if (response.getResponseCode() !== 200) {
-      throw new Error(`API Error: ${response.getResponseCode()} - ${response.getContentText()}`);
+      const errorText = response.getContentText();
+      console.error('API Error:', response.getResponseCode(), errorText);
+      return [["❌ API Error: " + response.getResponseCode()]];
     }
     
     const data = JSON.parse(response.getContentText());
     
     if (!data.data || !Array.isArray(data.data) || data.data.length === 0) {
-      throw new Error('Invalid response format from API');
+      console.error('Invalid API response format:', data);
+      return [["❌ Invalid response from API"]];
     }
     
     // Return the data array for spilling
@@ -372,13 +385,16 @@ function SCRAPE(url, selectors_range) {
   } catch (error) {
     console.error('SCRAPE function error:', error);
     
-    // Return a more helpful error message
-    if (error.message.includes('timeout') || error.message.includes('Timeout')) {
-      return [['API_TIMEOUT - Try fewer selectors or check API status']];
-    } else if (error.message.includes('DNS')) {
-      return [['DNS_ERROR - Check API URL configuration']];
+    // Return specific error messages based on error type
+    const errorMsg = error.message || error.toString();
+    if (errorMsg.includes('timeout') || errorMsg.includes('Timeout')) {
+      return [['❌ TIMEOUT - API took too long (>25s). Try fewer selectors.']];
+    } else if (errorMsg.includes('DNS')) {
+      return [['❌ CONNECTION - Cannot reach API server']];
+    } else if (errorMsg.includes('exceeded maximum execution time')) {
+      return [['❌ SHEETS_TIMEOUT - Function exceeded 30s limit']];
     } else {
-      return [[`ERROR: ${error.message}`]];
+      return [['❌ ERROR: ' + (errorMsg.length > 50 ? errorMsg.substring(0, 50) + '...' : errorMsg)]];
     }
   }
 }
@@ -420,15 +436,33 @@ function columnToLetter(column) {
 }
 
 /**
- * Basic scraping function with essential selectors only (faster, less likely to timeout)
+ * Fast scraping function with essential selectors only (optimized for 30-second limit)
  * 
  * @param {string} url - The URL to scrape
- * @return {Array} Array of scraped data for essential fields
+ * @return {Array} Array of scraped data for essential fields only
  * @customfunction
  */
 function SCRAPE_BASIC(url) {
-  // Essential selectors only
+  // Essential selectors only (6 fields for maximum speed)
   const basicSelectors = ['title', 'sale_price', 'rating', 'review_count', 'availability', 'brand_name'];
   
-  return SCRAPE(url, basicSelectors);
+  return SCRAPE(url, [basicSelectors]);
+}
+
+/**
+ * Medium scraping function with important selectors (optimized for 30-second limit)
+ * 
+ * @param {string} url - The URL to scrape
+ * @return {Array} Array of scraped data for important fields
+ * @customfunction
+ */
+function SCRAPE_MEDIUM(url) {
+  // Important selectors (15 fields - good balance of data vs speed)
+  const mediumSelectors = [
+    'title', 'sale_price', 'list_price', 'rating', 'review_count', 
+    'availability', 'brand_name', 'manufacturer', 'model', 'description',
+    'bullet_point_1', 'image_1_source', 'categories', 'asin', 'url'
+  ];
+  
+  return SCRAPE(url, [mediumSelectors]);
 } 
