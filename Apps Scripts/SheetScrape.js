@@ -41,6 +41,87 @@ const STANDARD_HEADERS = [
   '' // 1 blank column as requested
 ];
 
+// All available selectors for dropdown validation - users can change to any of these
+const ALL_SELECTORS = [
+  'title',
+  'asin',
+  'url',
+  'sale_price',
+  'list_price',
+  'sale_price_per_unit',
+  'rating',
+  'review_count',
+  'times_evaluated',
+  'availability',
+  'ships_from',
+  'brand_name',
+  'manufacturer',
+  'model',
+  'color_name',
+  'style_name',
+  'country_of_origin',
+  'description',
+  'bullet_points',
+  'bullet_point_1',
+  'bullet_point_2',
+  'bullet_point_3',
+  'bullet_point_4',
+  'bullet_point_5',
+  'bullet_point_6',
+  'image_1_source',
+  'image_2_source',
+  'image_3_source',
+  'image_4_source',
+  'image_5_source',
+  'image_6_source',
+  'featured_image_source',
+  'other_images_source',
+  'categories',
+  'categories_links',
+  'best_seller_category',
+  'best_seller_link_1',
+  'best_seller_link_2',
+  'best_seller_rank_1',
+  'best_seller_rank_2',
+  'item_weight',
+  'item_weight_unit_of_measure',
+  'item_dimensions_unit',
+  'item_length',
+  'item_length_unit_of_measure',
+  'item_width',
+  'item_width_unit_of_measure',
+  'item_height',
+  'item_height_unit_of_measure',
+  'package_dimensions',
+  'package_weight_unit',
+  'package_length',
+  'package_width',
+  'package_height',
+  'capacity',
+  'has_video',
+  'has_climate_pledge',
+  'a_plus_content',
+  'details_headers',
+  'details_values',
+  'feature_headers',
+  'feature_values',
+  'buybox_winner',
+  'buybox_winner_link',
+  'buybox_quantity_max',
+  'has_deal',
+  'has_coupon',
+  'coupon_value',
+  'current_variation_header',
+  'variation_1_asins',
+  'variation_1_name',
+  'variation_2_asins',
+  'variation_2_name',
+  'variation_3_asins',
+  'variation_3_name',
+  'variations_asins',
+  'offers_count'
+];
+
 /**
  * Creates the SheetScrape menu in the Google Sheets UI when the sheet opens
  */
@@ -156,7 +237,7 @@ function setupResetSheet() {
   
   // Create selector dropdown rule
   const selectorRule = SpreadsheetApp.newDataValidation()
-    .requireValueInList(STANDARD_HEADERS)
+    .requireValueInList(ALL_SELECTORS)
     .setAllowInvalid(false)
     .setHelpText('Choose data point to scrape')
     .build();
@@ -357,32 +438,53 @@ function columnToLetter(column) {
 }
 
 /**
+ * Helper function to reset headers to default STANDARD_HEADERS
+ */
+function resetHeadersToDefault() {
+  const sheet = SpreadsheetApp.getActiveSheet();
+  
+  // Reset headers starting from column D (column 4) using STANDARD_HEADERS
+  const headerRange = sheet.getRange(4, 4, 1, STANDARD_HEADERS.length);
+  headerRange.setValues([STANDARD_HEADERS]);
+  
+  // Update the image formula to match the correct position
+  sheet.getRange('C5').setValue('=IF(X5<>"", IMAGE(X5), "")');
+}
+
+/**
  * Fast scraping function with essential selectors only (optimized for 30-second limit)
+ * Resets headers to default before running: Title -> BP1-5, Description, Image 1
  * 
  * @param {string} url - The URL to scrape
  * @return {Array} Array of scraped data for essential fields only
  * @customfunction
  */
 function SCRAPE_BASIC(url) {
-  // Essential selectors only (6 fields for maximum speed) - from our 28-column list
-  const basicSelectors = ['title', 'availability', 'brand_name', 'asin', 'categories', 'image_1_source'];
+  // Reset headers to default first
+  resetHeadersToDefault();
+  
+  // Essential selectors: Title -> BP1-5, Description, Image 1 (8 fields)
+  const basicSelectors = ['title', 'bullet_point_1', 'bullet_point_2', 'bullet_point_3', 'bullet_point_4', 'bullet_point_5', 'description', 'image_1_source'];
   
   return SCRAPE(url, [basicSelectors]);
 }
 
 /**
  * Medium scraping function with important selectors (optimized for 30-second limit)
+ * Resets headers to default before running: Title, BP1-6, Description, Image 1-5
  * 
  * @param {string} url - The URL to scrape
  * @return {Array} Array of scraped data for important fields
  * @customfunction
  */
 function SCRAPE_MEDIUM(url) {
-  // Important selectors (15 fields - good balance of data vs speed) - from our 28-column list
+  // Reset headers to default first
+  resetHeadersToDefault();
+  
+  // Medium selectors: Title, BP1-6, Description, Image 1-5 (13 fields)
   const mediumSelectors = [
-    'title', 'bullet_point_1', 'bullet_point_2', 'description', 'availability',
-    'brand_name', 'asin', 'categories', 'image_1_source', 'image_2_source', 
-    'image_3_source', 'has_video', 'buybox_winner', 'times_evaluated', 'variations_asins'
+    'title', 'bullet_point_1', 'bullet_point_2', 'bullet_point_3', 'bullet_point_4', 'bullet_point_5', 'bullet_point_6',
+    'description', 'image_1_source', 'image_2_source', 'image_3_source', 'image_4_source', 'image_5_source'
   ];
   
   return SCRAPE(url, [mediumSelectors]);
