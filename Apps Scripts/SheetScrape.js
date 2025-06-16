@@ -245,6 +245,17 @@ function setupResetSheet() {
   // image_1_source is at position 21 in STANDARD_HEADERS (0-based), so column D=4, so image_1_source = column 4+20 = column X (24)
   sheet.getRange('C5').setValue('=IF(X5<>"", IMAGE(X5), "")');
   
+  // Format C4 (image header) with same card-like styling as other headers
+  const imageHeaderCell = sheet.getRange('C4');
+  imageHeaderCell.setHorizontalAlignment('center');
+  imageHeaderCell.setVerticalAlignment('middle');
+  imageHeaderCell.setBorder(true, true, true, true, true, true, '#4285F4', SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
+  imageHeaderCell.setBackground('#F8F9FA'); // Same card background
+  imageHeaderCell.setFontColor('#1A73E8'); // Same blue text color
+  imageHeaderCell.setFontSize(10); // Same font size
+  sheet.setColumnWidth(3, 120); // Set image column width
+  sheet.setRowHeight(4, 72); // Ensure row height is consistent
+  
   // Add headers starting from column D (column 4) using STANDARD_HEADERS
   const headerRange = sheet.getRange(4, 4, 1, STANDARD_HEADERS.length);
   headerRange.setValues([STANDARD_HEADERS]);
@@ -310,6 +321,12 @@ function setupResetSheet() {
   sheet.getRange('A4:B4').setVerticalAlignment('middle');
   sheet.setColumnWidth(1, 120); // ASIN column width
   sheet.setColumnWidth(2, 200); // URL column width
+  
+  // Add text wrapping for URL column (B5 and beyond) for better readability
+  const urlDataRange = sheet.getRange(5, 2, 100, 1); // Column B, rows 5-104
+  urlDataRange.setWrap(true);
+  urlDataRange.setHorizontalAlignment('left');
+  urlDataRange.setVerticalAlignment('top');
   
   ui.alert('✅ Success!', 'Sheet has been set up with the ideal SheetScrape layout.', ui.ButtonSet.OK);
 }
