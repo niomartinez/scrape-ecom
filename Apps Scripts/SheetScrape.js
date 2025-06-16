@@ -6,7 +6,8 @@
 // --- Configuration ---
 // This should point to your backend API. Use your local URL for testing.
 // When you deploy, change this to your live server URL.
-const API_URL = "http://localhost:8000/scrape";
+// For Render deployment, use: https://your-service-name.onrender.com/scrape
+const API_URL = "https://sheetscrape-api.onrender.com/scrape";  // Update this with your actual Render URL
 
 /**
  * Creates the SheetScrape menu in the Google Sheets UI when the sheet opens
