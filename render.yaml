@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: sheetscrape-api
+    runtime: python
+    plan: starter  # You can change this to a higher plan if needed
+    buildCommand: pip install -r requirements.txt && playwright install chromium
+    startCommand: python run.py
+    envVars:
+      - key: SECRET_API_KEY
+        value: NzU3MjM3NjM5ZWE5MjhiNGRjOTc3MjE3Y2Y3ODg1YjE4YjI5ZWE5MGU4Y2U5MjI5MmY4YWEyNDE3MTQ5M2U5NQ==
+      - key: PORT
+        value: 10000
+      - key: PYTHON_VERSION
+        value: 3.11.0
+    autoDeploy: true
+    branch: dev
+    healthCheckPath: /health 
