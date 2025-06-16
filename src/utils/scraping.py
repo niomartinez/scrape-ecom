@@ -176,36 +176,51 @@ def extract_specific_selectors(html_content: str, requested_selectors: List[str]
     soup = BeautifulSoup(html_content, 'html.parser')
     results = []
     
+    logger.info(f"Extracting {len(requested_selectors)} selectors from HTML content")
+    
     for key in requested_selectors:
         try:
             selector = selector_map.get(key)
             
             if not selector:
                 # If selector not found in the map
+                logger.warning(f"Selector '{key}' not found in selector map")
                 results.append(f"N/A: Unknown selector '{key}'")
                 continue
+            
+            logger.info(f"Processing selector '{key}' with CSS: '{selector}'")
             
             # Handle comma-separated selectors as fallbacks
             if ',' in selector:
                 # Try each selector in order until one works
+                found_data = False
                 for single_selector in selector.split(','):
                     single_selector = single_selector.strip()
+                    logger.info(f"  Trying fallback selector: '{single_selector}'")
                     
                     # Check if we need to extract an attribute
                     if '@' in single_selector:
                         css_selector, attribute = single_selector.split('@')
                         element = soup.select_one(css_selector)
                         if element and element.get(attribute):
-                            results.append(element.get(attribute, ""))
+                            data = element.get(attribute, "")
+                            logger.info(f"  Found data via attribute '{attribute}': '{data[:100]}...'")
+                            results.append(data)
+                            found_data = True
                             break
                     else:
                         # Otherwise, just get the text content
                         element = soup.select_one(single_selector)
                         if element and element.get_text(strip=True):
-                            results.append(element.get_text(strip=True))
+                            data = element.get_text(strip=True)
+                            logger.info(f"  Found data via text: '{data[:100]}...'")
+                            results.append(data)
+                            found_data = True
                             break
-                else:
+                
+                if not found_data:
                     # If we tried all selectors and none worked
+                    logger.warning(f"  No data found for any fallback selectors for '{key}'")
                     results.append("")
             else:
                 # Handle single selector (no comma)
@@ -213,16 +228,25 @@ def extract_specific_selectors(html_content: str, requested_selectors: List[str]
                     css_selector, attribute = selector.split('@')
                     element = soup.select_one(css_selector)
                     data = element.get(attribute, "") if element else ""
+                    if data:
+                        logger.info(f"  Found data via attribute '{attribute}': '{data[:100]}...'")
+                    else:
+                        logger.warning(f"  No data found for attribute selector '{css_selector}@{attribute}'")
                 else:
                     # Otherwise, just get the text content
                     element = soup.select_one(selector)
                     data = element.get_text(strip=True) if element else ""
+                    if data:
+                        logger.info(f"  Found data via text: '{data[:100]}...'")
+                    else:
+                        logger.warning(f"  No data found for text selector '{selector}'")
                 
                 results.append(data)
         except Exception as e:
-            logger.warning(f"Failed to extract {key}: {e}")
+            logger.error(f"Failed to extract {key}: {e}")
             results.append("")
     
+    logger.info(f"Final extraction results: {[r[:50] + '...' if len(r) > 50 else r for r in results]}")
     return results
 
 

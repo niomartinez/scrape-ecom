@@ -143,7 +143,7 @@ async def scrape_url(request: ScrapeRequest):
     force_refresh = request.force_refresh
     
     logger.info(f"Processing request for URL: {url} in marketplace: {marketplace}")
-    logger.debug(f"Requested selectors: {selectors}")
+    logger.info(f"Requested selectors: {selectors}")
     
     # Check for cached result if Redis is available
     if redis_client and not force_refresh:
@@ -156,6 +156,7 @@ async def scrape_url(request: ScrapeRequest):
     try:
         # Choose scraping method based on URL
         html_content = await choose_scraping_method(url)
+        logger.info(f"Successfully scraped HTML content, length: {len(html_content)} characters")
         
         # Get selectors map for this domain (currently optimized for Amazon)
         domain_selectors = get_selectors_for_domain(url, marketplace)
@@ -163,8 +164,11 @@ async def scrape_url(request: ScrapeRequest):
         if not domain_selectors:
             raise HTTPException(status_code=400, detail="Domain not supported")
         
+        logger.info(f"Using {len(domain_selectors)} available selectors for domain")
+        
         # Extract only the requested selectors in the order specified
         results = extract_specific_selectors(html_content, selectors, domain_selectors)
+        logger.info(f"Extraction results: {results}")
         
         # Format response as expected by Google Sheets
         response = {"data": [results]}
@@ -175,6 +179,7 @@ async def scrape_url(request: ScrapeRequest):
             # Cache for 24 hours
             redis_client.setex(cache_key, 86400, json.dumps(response))
         
+        logger.info(f"Returning response: {response}")
         return response
     except ScrapingError as e:
         logger.error(f"Scraping error for URL {url}: {e}")
