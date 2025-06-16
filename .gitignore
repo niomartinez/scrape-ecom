@@ -161,3 +161,37 @@ dmypy.json
 
 # pytype static type analyzer
 .pytype/
+
+# Playwright browsers
+/ms-playwright/
+
+# API Keys and secrets
+*.key
+*.pem
+secrets.json
+config.json
+
+# Temporary files
+*.tmp
+*.temp
+temp/
+tmp/
+
+# Backup files
+*.bak
+*.backup
+
+# Local configuration files
+local_settings.py
+local_config.py
+
+# Docker
+.dockerignore
+
+# Deployment files (keep examples)
+!render.yaml
+!Dockerfile
+!Procfile
+
+# Google Apps Script (keep the main files)
+!Apps\ Scripts/
