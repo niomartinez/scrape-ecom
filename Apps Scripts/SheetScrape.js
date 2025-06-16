@@ -9,6 +9,52 @@
 // For Render deployment, use: https://your-service-name.onrender.com/scrape
 const API_URL = "https://sheetscrape-api.onrender.com/scrape";  // Update this with your actual Render URL
 
+// Define the standard header order that matches our backend selectors
+const STANDARD_HEADERS = [
+  'title',
+  'bullet_point_1', 
+  'bullet_point_2',
+  'bullet_point_3', 
+  'bullet_point_4',
+  'bullet_point_5',
+  'bullet_points',
+  'description',
+  'a_plus_content',
+  'availability',
+  'brand_name',
+  'buybox_winner',
+  'buybox_winner_link', 
+  'variations_asins',
+  'best_seller_category',
+  'best_seller_rank_1',
+  'best_seller_rank_2', 
+  'times_evaluated',
+  'asin',
+  'categories',
+  'image_1_source',
+  'image_2_source',
+  'image_3_source',
+  'image_4_source', 
+  'image_5_source',
+  'image_6_source',
+  'has_video',
+  'sale_price',
+  'list_price',
+  'rating',
+  'review_count',
+  'manufacturer',
+  'model',
+  'url',
+  'featured_image_source',
+  'other_images_source',
+  'categories_links',
+  'item_weight',
+  'package_dimensions',
+  'has_deal',
+  'has_coupon',
+  'coupon_value'
+];
+
 /**
  * Creates the SheetScrape menu in the Google Sheets UI when the sheet opens
  */
@@ -109,86 +155,6 @@ function setupResetSheet() {
     'amazon.sg'
   ];
   
-  // All available selectors - must match backend exactly
-  const allSelectors = [
-    'title',
-    'asin',
-    'url',
-    'sale_price',
-    'list_price',
-    'sale_price_per_unit',
-    'rating',
-    'review_count',
-    'times_evaluated',
-    'availability',
-    'ships_from',
-    'brand_name',
-    'manufacturer',
-    'model',
-    'color_name',
-    'style_name',
-    'country_of_origin',
-    'description',
-    'bullet_points',
-    'bullet_point_1',
-    'bullet_point_2',
-    'bullet_point_3',
-    'bullet_point_4',
-    'bullet_point_5',
-    'bullet_point_6',
-    'image_1_source',
-    'image_2_source',
-    'image_3_source',
-    'image_4_source',
-    'image_5_source',
-    'image_6_source',
-    'featured_image_source',
-    'other_images_source',
-    'categories',
-    'categories_links',
-    'best_seller_category',
-    'best_seller_link_1',
-    'best_seller_link_2',
-    'best_seller_rank_1',
-    'best_seller_rank_2',
-    'item_weight',
-    'item_weight_unit_of_measure',
-    'item_dimensions_unit',
-    'item_length',
-    'item_length_unit_of_measure',
-    'item_width',
-    'item_width_unit_of_measure',
-    'item_height',
-    'item_height_unit_of_measure',
-    'package_dimensions',
-    'package_weight_unit',
-    'package_length',
-    'package_width',
-    'package_height',
-    'capacity',
-    'has_video',
-    'has_climate_pledge',
-    'a_plus_content',
-    'details_headers',
-    'details_values',
-    'feature_headers',
-    'feature_values',
-    'buybox_winner',
-    'buybox_winner_link',
-    'buybox_quantity_max',
-    'has_deal',
-    'has_coupon',
-    'coupon_value',
-    'current_variation_header',
-    'variation_1_asins',
-    'variation_1_name',
-    'variation_2_asins',
-    'variation_2_name',
-    'variation_3_asins',
-    'variation_3_name',
-    'variations_asins',
-    'offers_count'
-  ];
   // Set up B2 marketplace dropdown
   sheet.getRange('A2').setValue('Marketplace:').setFontWeight('bold');
   const marketplaceRule = SpreadsheetApp.newDataValidation()
@@ -204,76 +170,44 @@ function setupResetSheet() {
   
   // Create selector dropdown rule
   const selectorRule = SpreadsheetApp.newDataValidation()
-    .requireValueInList(allSelectors)
+    .requireValueInList(STANDARD_HEADERS)
     .setAllowInvalid(false)
     .setHelpText('Choose data point to scrape')
     .build();
   
-
   // Set up C4 with just "Image" by default and has the formula on C5 as =IF(AM5<>"", IMAGE(AM5), "")
   sheet.getRange('C4').setValue('image').setFontWeight('bold').setBackground('#f0f0f0');
-  sheet.getRange('C5').setValue('=IF(AM5<>"", IMAGE(AM5), "")');
-
+  sheet.getRange('C5').setValue('=IF(Y5<>"", IMAGE(Y5), "")'); // Updated to match image_1_source position
   
-  // Set up D4 with title default
-  sheet.getRange('D4').setDataValidation(selectorRule).setValue('title')
-    .setFontWeight('bold').setBackground('#f0f0f0');
-
-  // Set up D5 with formula =SCRAPE($B5, $D$4:$BZ$4)
-  sheet.getRange('D5').setValue('=SCRAPE($B5, $D$4:$CA$4)');
+  // Add headers starting from column D (column 4) using STANDARD_HEADERS
+  const headerRange = sheet.getRange(4, 4, 1, STANDARD_HEADERS.length);
+  headerRange.setValues([STANDARD_HEADERS]);
   
-  // Set up E4 with bullet_point_1 default
-  sheet.getRange('E4').setDataValidation(selectorRule).setValue('bullet_point_1')
-    .setFontWeight('bold').setBackground('#f0f0f0');
+  // Format headers
+  headerRange.setFontWeight('bold');
+  headerRange.setBackground('#E8F0FE');
+  headerRange.setBorder(true, true, true, true, true, true);
   
-  // First, make sure the sheet has enough columns for all our selectors
-  // Google Sheets default is usually 26 columns (A-Z), we need to ensure we have enough
-  const totalColumnsNeeded = 6 + allSelectors.length - 3; // Starting from col F (6) + all remaining selectors
-  const currentLastColumn = sheet.getLastColumn();
-  
-  if (currentLastColumn < totalColumnsNeeded) {
-    // Add more columns if needed - we may need to insert additional columns
-    const columnsToAdd = totalColumnsNeeded - currentLastColumn;
-    if (columnsToAdd > 0) {
-      sheet.insertColumnsAfter(currentLastColumn, columnsToAdd);
-    }
-  }
-  
-  // Use all selectors as requested
-  const startColumn = 6; // Column F
-  const endColumn = startColumn + allSelectors.length - 3; // Include all selectors
-  
-  for (let i = 0; i < allSelectors.length - 3; i++) {
-    const columnIndex = startColumn + i;
-    const cell = sheet.getRange(4, columnIndex);
-    cell.setDataValidation(selectorRule)
-      .setValue(allSelectors[i + 3]) // Skip the first 3 we already used
-      .setFontWeight('bold')
-      .setBackground('#f0f0f0');
+  // Add data validation to header cells so users can change them
+  for (let i = 0; i < STANDARD_HEADERS.length; i++) {
+    const cell = sheet.getRange(4, 4 + i);
+    cell.setDataValidation(selectorRule);
   }
   
   // Add some sample data and formulas
   sheet.getRange('A5').setValue('B0CRDCXRK2'); // Sample ASIN - ASUS RTX 5070 Ti (known working)
   sheet.getRange('B5').setValue('=CONCATENATE("https://", B$2, "/dp/", A5)'); // Dynamic URL formula
   
-  // // Add instructions
-  // sheet.getRange('A1').setValue('SheetScrape Setup Complete! 🎉').setFontWeight('bold').setFontSize(14);
-  // sheet.getRange('A6').setValue('Instructions:').setFontWeight('bold');
-  // sheet.getRange('A7').setValue('1. Add more ASINs in column A (starting from A5)');
-  // sheet.getRange('A8').setValue('2. Drag the URL formula in B5 down to match your ASINs');
+  // Add sample SCRAPE formula using the new headers
+  const lastColumn = columnToLetter(4 + STANDARD_HEADERS.length - 1);
+  sheet.getRange('D5').setValue(`=SCRAPE($B5, $D$4:$${lastColumn}$4)`);
   
-  // // Calculate the column letter for the last selector column
-  // const lastColumnLetter = columnToLetter(endColumn);
-  // sheet.getRange('A9').setValue(`3. In C5, enter: =SCRAPE(B5, C$4:${lastColumnLetter}$4)`);
-  // sheet.getRange('A10').setValue('4. Drag the SCRAPE formula down to process all your ASINs');
-  
-  // // Style the instructions
-  // sheet.getRange('A6:A10').setFontStyle('italic').setBackground('#fff2cc');
+  // Format the sample data
+  sheet.getRange('A5:B5').setBorder(true, true, true, true, true, true);
+  sheet.getRange('D5').setBorder(true, true, true, true, true, true);
   
   ui.alert('✅ Success!', 'Sheet has been set up with the ideal SheetScrape layout.', ui.ButtonSet.OK);
 }
-
-
 
 /**
  * Shows help and documentation for SheetScrape
@@ -319,8 +253,8 @@ function SCRAPE(url, selectors_range) {
     return [["❌ Error: URL and selector range are required"]];
   }
 
-  // Get API key from script properties
-  const apiKey = PropertiesService.getScriptProperties().getProperty('API_KEY');
+  // Get API key from document properties (not script properties)
+  const apiKey = PropertiesService.getDocumentProperties().getProperty('SHEETSCRAPE_API_KEY');
   if (!apiKey) {
     return [["❌ Error: API key not configured. Run Setup/Reset from menu."]];
   }
@@ -443,8 +377,8 @@ function columnToLetter(column) {
  * @customfunction
  */
 function SCRAPE_BASIC(url) {
-  // Essential selectors only (6 fields for maximum speed)
-  const basicSelectors = ['title', 'sale_price', 'rating', 'review_count', 'availability', 'brand_name'];
+  // Essential selectors only (6 fields for maximum speed) - in standard order
+  const basicSelectors = ['title', 'sale_price', 'rating', 'availability', 'brand_name', 'asin'];
   
   return SCRAPE(url, [basicSelectors]);
 }
@@ -457,11 +391,11 @@ function SCRAPE_BASIC(url) {
  * @customfunction
  */
 function SCRAPE_MEDIUM(url) {
-  // Important selectors (15 fields - good balance of data vs speed)
+  // Important selectors (15 fields - good balance of data vs speed) - in standard order
   const mediumSelectors = [
-    'title', 'sale_price', 'list_price', 'rating', 'review_count', 
-    'availability', 'brand_name', 'manufacturer', 'model', 'description',
-    'bullet_point_1', 'image_1_source', 'categories', 'asin', 'url'
+    'title', 'bullet_point_1', 'bullet_point_2', 'description', 'availability',
+    'brand_name', 'asin', 'categories', 'image_1_source', 'sale_price', 
+    'list_price', 'rating', 'review_count', 'manufacturer', 'url'
   ];
   
   return SCRAPE(url, [mediumSelectors]);
