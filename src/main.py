@@ -3,6 +3,8 @@ SheetScrape Backend API
 
 This is the main FastAPI application file that handles the web scraping requests
 from the Google Apps Script frontend.
+
+Updated to use Axesso API instead of web scraping to avoid bot detection.
 """
 
 import os
@@ -19,12 +21,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 # Import our modules
-from src.selectors.amazon import get_selectors_for_domain
-from src.utils.scraping import (
-    choose_scraping_method,
-    extract_specific_selectors,
-    ScrapingError
-)
+from src.utils.axesso import AxessoClient, AxessoError, map_axesso_to_selectors
 
 # Load environment variables
 load_dotenv()
@@ -47,6 +44,14 @@ if REDIS_URL:
         logger.warning(f"Redis initialization failed: {e}. Caching disabled.")
 else:
     logger.warning("REDIS_URL not found in environment. Caching disabled.")
+
+# Initialize Axesso client
+try:
+    axesso_client = AxessoClient()
+    logger.info("Axesso API client initialized successfully")
+except AxessoError as e:
+    logger.error(f"Failed to initialize Axesso client: {e}")
+    axesso_client = None
 
 # --- Models for API Data Structure ---
 class ScrapeRequest(BaseModel):
@@ -75,8 +80,8 @@ async def verify_api_key(x_api_key: str = Header(...)):
 # --- FastAPI Application ---
 app = FastAPI(
     title="SheetScrape API",
-    description="An API to scrape web data for the SheetScrape Google Sheets Add-on.",
-    version="1.0.0",
+    description="An API to scrape web data for the SheetScrape Google Sheets Add-on using Axesso API.",
+    version="1.1.0",
 )
 
 # Add CORS middleware to allow requests from Google Apps Script
@@ -90,14 +95,22 @@ app.add_middleware(
 
 @app.get("/")
 async def read_root():
-    return {"status": "online", "message": "SheetScrape API is running"}
+    return {
+        "status": "online", 
+        "message": "SheetScrape API is running with Axesso integration",
+        "version": "1.1.0"
+    }
 
 @app.get("/health")
 async def health_check():
+    """Health check endpoint with Axesso API status"""
+    axesso_status = "enabled" if axesso_client else "disabled"
     return {
         "status": "healthy",
-        "version": "1.0.0",
-        "timestamp": time.time()
+        "version": "1.1.0",
+        "timestamp": time.time(),
+        "axesso_api": axesso_status,
+        "caching": "enabled" if redis_client else "disabled"
     }
 
 @app.get("/cache/stats", dependencies=[Depends(verify_api_key)])
@@ -130,12 +143,25 @@ async def clear_cache():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error clearing cache: {e}")
 
+def is_amazon_url(url: str) -> bool:
+    """Check if the URL is an Amazon product URL"""
+    amazon_domains = [
+        'amazon.com', 'amazon.ca', 'amazon.com.mx', 'amazon.com.br',
+        'amazon.co.uk', 'amazon.fr', 'amazon.de', 'amazon.nl',
+        'amazon.es', 'amazon.it', 'amazon.com.tr', 'amazon.in',
+        'amazon.sa', 'amazon.ae', 'amazon.eg', 'amazon.co.jp',
+        'amazon.com.au', 'amazon.sg'
+    ]
+    
+    url_lower = url.lower()
+    return any(domain in url_lower for domain in amazon_domains)
+
 @app.post("/scrape", dependencies=[Depends(verify_api_key)])
 async def scrape_url(request: ScrapeRequest):
     """
-    Receives a URL and a list of selectors, scrapes the page, and returns the data.
+    Receives a URL and a list of selectors, gets the data using Axesso API, and returns the results.
     
-    If Redis is configured, results are cached for 24 hours unless force_refresh is True.
+    If Redis is configured, results are cached for 6 hours unless force_refresh is True.
     """
     url = request.url
     selectors = request.selectors
@@ -145,9 +171,19 @@ async def scrape_url(request: ScrapeRequest):
     logger.info(f"Processing request for URL: {url} in marketplace: {marketplace}")
     logger.info(f"Requested selectors: {selectors}")
     
+    # Check if Axesso client is available
+    if not axesso_client:
+        logger.error("Axesso API client not available")
+        raise HTTPException(status_code=500, detail="Axesso API client not configured. Please check AXESSO_API_KEY.")
+    
+    # Validate that this is an Amazon URL
+    if not is_amazon_url(url):
+        logger.error(f"Non-Amazon URL provided: {url}")
+        raise HTTPException(status_code=400, detail="Only Amazon product URLs are supported")
+    
     # Check for cached result if Redis is available
     if redis_client and not force_refresh:
-        cache_key = f"sheetscrape:{url}:{','.join(selectors)}:{marketplace}"
+        cache_key = f"sheetscrape:axesso:{url}:{','.join(selectors)}:{marketplace}"
         cached_data = redis_client.get(cache_key)
         if cached_data:
             logger.info(f"Returning cached data for {url}")
@@ -155,30 +191,36 @@ async def scrape_url(request: ScrapeRequest):
                 cached_result = json.loads(cached_data)
                 return {"data": cached_result}
             except json.JSONDecodeError:
-                logger.warning("Failed to parse cached data, proceeding with fresh scrape")
+                logger.warning("Failed to parse cached data, proceeding with fresh API call")
     
-    # Scrape the URL
+    # Get product data from Axesso API
     try:
-        html_content = await choose_scraping_method(url)
-        logger.info(f"Successfully scraped HTML content, length: {len(html_content)} characters")
+        logger.info(f"Making Axesso API call for {url}")
+        axesso_data = axesso_client.get_product_data(url)
+        logger.info(f"Successfully retrieved Axesso data for ASIN: {axesso_data.get('asin', 'Unknown')}")
+    except AxessoError as e:
+        logger.error(f"Axesso API error for {url}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Axesso API error: {str(e)}")
     except Exception as e:
-        logger.error(f"Failed to scrape {url}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Scraping failed: {str(e)}")
+        logger.error(f"Unexpected error calling Axesso API for {url}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"API call failed: {str(e)}")
     
-    # Get selectors for the domain
-    domain_selectors = get_selectors_for_domain(url, marketplace)
-    logger.info(f"Using {len(domain_selectors)} available selectors for domain")
-    
-    # Extract the requested data
-    extracted_data = extract_specific_selectors(html_content, selectors, domain_selectors)
-    logger.info(f"Extraction results: {[item[:50] + '...' if len(str(item)) > 50 else item for item in extracted_data]}")
+    # Map Axesso data to the requested selectors
+    try:
+        logger.info(f"Mapping Axesso data to {len(selectors)} requested selectors")
+        extracted_data = map_axesso_to_selectors(axesso_data, selectors)
+        logger.info(f"Successfully mapped data: {[item[:50] + '...' if len(str(item)) > 50 else item for item in extracted_data]}")
+    except Exception as e:
+        logger.error(f"Error mapping Axesso data: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Data mapping failed: {str(e)}")
     
     # Prepare response data as a 2D array for Google Sheets spilling
     response_data = [extracted_data]
     
-    # Cache the result if Redis is available (cache for 6 hours instead of 24)
+    # Cache the result if Redis is available (cache for 6 hours)
     if redis_client:
         try:
+            cache_key = f"sheetscrape:axesso:{url}:{','.join(selectors)}:{marketplace}"
             redis_client.setex(cache_key, 21600, json.dumps(response_data))  # 6 hours cache
             logger.info(f"Cached result for {url}")
         except Exception as e:
@@ -186,6 +228,32 @@ async def scrape_url(request: ScrapeRequest):
     
     logger.info(f"Returning response: {{'data': {[item[:30] + '...' if len(str(item)) > 30 else item for item in response_data[0]]}}}")
     return {"data": response_data}
+
+@app.get("/test-axesso", dependencies=[Depends(verify_api_key)])
+async def test_axesso():
+    """Test endpoint to verify Axesso API integration"""
+    if not axesso_client:
+        raise HTTPException(status_code=500, detail="Axesso API client not configured")
+    
+    # Test with a known working ASIN
+    test_url = "https://amazon.com/dp/B0CRDCXRK2"
+    test_selectors = ["title", "sale_price", "rating", "asin"]
+    
+    try:
+        axesso_data = axesso_client.get_product_data(test_url)
+        mapped_data = map_axesso_to_selectors(axesso_data, test_selectors)
+        
+        return {
+            "status": "success",
+            "test_url": test_url,
+            "test_selectors": test_selectors,
+            "mapped_data": dict(zip(test_selectors, mapped_data)),
+            "raw_asin": axesso_data.get('asin'),
+            "raw_title": axesso_data.get('productTitle', '')[:100] + "..."
+        }
+    except Exception as e:
+        logger.error(f"Axesso test failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Axesso test failed: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn
