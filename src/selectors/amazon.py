@@ -59,6 +59,9 @@ AMAZON_SELECTORS = {
     'image_4_source': '#altImages .item:nth-of-type(4) img@src',
     'image_5_source': '#altImages .item:nth-of-type(5) img@src',
     'image_6_source': '#altImages .item:nth-of-type(6) img@src',
+    'image_7_source': '#altImages .item:nth-of-type(7) img@src',
+    'image_8_source': '#altImages .item:nth-of-type(8) img@src',
+    'image_9_source': '#altImages .item:nth-of-type(9) img@src',
     'featured_image_source': '#landingImage@src',
     'other_images_source': '#altImages .item img@src',
     

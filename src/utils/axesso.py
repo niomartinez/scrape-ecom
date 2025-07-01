@@ -148,6 +148,9 @@ def map_axesso_to_selectors(axesso_data: Dict[str, Any], requested_selectors: Li
         'image_4_source': lambda data: data.get('imageUrlList', ['', '', '', ''])[3] if len(data.get('imageUrlList', [])) > 3 else '',
         'image_5_source': lambda data: data.get('imageUrlList', ['', '', '', '', ''])[4] if len(data.get('imageUrlList', [])) > 4 else '',
         'image_6_source': lambda data: data.get('imageUrlList', ['', '', '', '', '', ''])[5] if len(data.get('imageUrlList', [])) > 5 else '',
+        'image_7_source': lambda data: data.get('imageUrlList', ['', '', '', '', '', '', ''])[6] if len(data.get('imageUrlList', [])) > 6 else '',
+        'image_8_source': lambda data: data.get('imageUrlList', ['', '', '', '', '', '', '', ''])[7] if len(data.get('imageUrlList', [])) > 7 else '',
+        'image_9_source': lambda data: data.get('imageUrlList', ['', '', '', '', '', '', '', '', ''])[8] if len(data.get('imageUrlList', [])) > 8 else '',
         'featured_image_source': lambda data: data.get('mainImage', {}).get('imageUrl', ''),
         'other_images_source': lambda data: ', '.join(data.get('imageUrlList', [])),
         

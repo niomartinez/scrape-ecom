@@ -6,7 +6,7 @@
 // --- Configuration ---
 const API_URL = "https://sheetscrape-api.onrender.com/scrape"; 
 
-// Define the standard header order that matches our backend selectors (28 columns + 1 blank)
+// Define the standard header order that matches our backend selectors (31 columns + 1 blank)
 const STANDARD_HEADERS = [
   'title',
   'bullet_point_1', 
@@ -34,6 +34,9 @@ const STANDARD_HEADERS = [
   'image_4_source', 
   'image_5_source',
   'image_6_source',
+  'image_7_source',
+  'image_8_source',
+  'image_9_source',
   'has_video',
   '' // 1 blank column as requested
 ];
@@ -71,6 +74,9 @@ const ALL_SELECTORS = [
   'image_4_source',
   'image_5_source',
   'image_6_source',
+  'image_7_source',
+  'image_8_source',
+  'image_9_source',
   'featured_image_source',
   'other_images_source',
   'categories',
@@ -125,15 +131,51 @@ const ALL_SELECTORS = [
 function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('SheetScrape')
-    .addSubMenu(SpreadsheetApp.getUi().createMenu('Account')
-      .addItem('Set API Key', 'showApiKeyPrompt')
-      .addItem('View Account Info', 'showAccountInfo'))
-    .addSeparator()
+    .addItem('Set API Key', 'showApiKeyPrompt')
+    .addItem('View Account Info', 'showAccountInfo')
     .addItem('Setup/Reset Sheet', 'setupResetSheet')
     .addItem('Reset Headers to Standard', 'resetToStandardHeaders')
     .addSeparator()
     .addItem('Help & Documentation', 'showHelp')
     .addToUi();
+}
+
+/**
+ * Creates and returns a generic card for the add-on homepage.
+ * This is called when the add-on is opened from the G Suite Marketplace listing
+ * or from the Add-ons menu before it has file access.
+ * @param {Object} e The event object.
+ * @return {Card} A card built with the CardService.
+ */
+function onHomepage(e) {
+  console.log("onHomepage event:", JSON.stringify(e));
+  return createSheetScrapeCard("Welcome to SheetScrape!", "Use the menu to get started or set your API key.");
+}
+
+/**
+ * Handles the onFileScopeGranted trigger.
+ * This is called after the user grants file access to the add-on for the current document.
+ * @param {Object} e The event object.
+ */
+function onFileScopeGranted(e) {
+  console.log("onFileScopeGranted event:", JSON.stringify(e));
+  // Could potentially run onOpen here or a specific setup if needed after granting scope
+  // For now, just log it. If onOpen is set as the sheets.homepageTrigger, it might already run.
+  // Consider if initial setup specific to a new document is needed here.
+  onOpen(); // Rebuild the menu now that we have file scope.
+}
+
+/**
+ * Helper function to create a generic Card for the add-on.
+ * @param {string} title The title for the card.
+ * @param {string} message The main message for the card.
+ * @return {CardService.Card}
+ */
+function createSheetScrapeCard(title, message) {
+  return CardService.newCardBuilder()
+    .setHeader(CardService.newCardHeader().setTitle(title))
+    .addSection(CardService.newCardSection().addWidget(CardService.newTextParagraph().setText(message)))
+    .build();
 }
 
 /**
@@ -149,9 +191,9 @@ function showApiKeyPrompt() {
   if (result.getSelectedButton() == ui.Button.OK) {
     const apiKey = result.getResponseText().trim();
     if (apiKey) {
-      // Store the key for the current user, specific to this document
-      PropertiesService.getDocumentProperties().setProperty('SHEETSCRAPE_API_KEY', apiKey);
-      ui.alert('✅ API Key saved successfully!');
+      // Store the key for the current user (available across their documents)
+      PropertiesService.getUserProperties().setProperty('SHEETSCRAPE_API_KEY', apiKey);
+      ui.alert('✅ API Key saved successfully! It will be available across all your spreadsheets.');
     } else {
       ui.alert('❌ Please enter a valid API key.');
     }
@@ -163,16 +205,16 @@ function showApiKeyPrompt() {
  */
 function showAccountInfo() {
   const ui = SpreadsheetApp.getUi();
-  const apiKey = PropertiesService.getDocumentProperties().getProperty('SHEETSCRAPE_API_KEY');
+  const apiKey = PropertiesService.getUserProperties().getProperty('SHEETSCRAPE_API_KEY');
   
   if (apiKey) {
-    const maskedKey = apiKey.substring(0, 8) + '...' + apiKey.substring(apiKey.length - 4);
+    const maskedKey = apiKey.length > 12 ? apiKey.substring(0, 8) + '...' + apiKey.substring(apiKey.length - 4) : 'Invalid Key Format';
     ui.alert('SheetScrape Account Info', 
              `API Key: ${maskedKey}\nStatus: Connected`, 
              ui.ButtonSet.OK);
   } else {
     ui.alert('SheetScrape Account Info', 
-             'No API key set. Please use Account > Set API Key to configure your credentials.', 
+             'No API key set. Please use SheetScrape > Set API Key to configure your credentials.', 
              ui.ButtonSet.OK);
   }
 }
@@ -242,7 +284,7 @@ function setupResetSheet() {
   
   // Set up C4 with just "Image" by default and has the formula on C5 as =IF(image_1_source<>"", IMAGE(image_1_source), "")
   sheet.getRange('C4').setValue('image').setFontWeight('bold').setBackground('#f0f0f0');
-  // image_1_source is at position 21 in STANDARD_HEADERS (0-based), so column D=4, so image_1_source = column 4+20 = column X (24)
+  // image_1_source is at position 20 in STANDARD_HEADERS (0-based), so column D=4, so image_1_source = column 4+20 = column X (24)
   sheet.getRange('C5').setValue('=IF(X5<>"", IMAGE(X5), "")');
   
   // Format C4 (image header) with same card-like styling as other headers
@@ -340,7 +382,7 @@ function showHelp() {
 🔧 SheetScrape Quick Start Guide:
 
 1️⃣ Setup:
-   • Set your API key: SheetScrape > Account > Set API Key
+   • Set your API key: SheetScrape > Set API Key
    • Set up your sheet: SheetScrape > Setup/Reset Sheet
 
 2️⃣ Usage:
@@ -375,10 +417,10 @@ function SCRAPE(url, selectors_range) {
     return [["❌ Error: URL and selector range are required"]];
   }
 
-  // Get API key from document properties (not script properties)
-  const apiKey = PropertiesService.getDocumentProperties().getProperty('SHEETSCRAPE_API_KEY');
+  // Get API key from user properties
+  const apiKey = PropertiesService.getUserProperties().getProperty('SHEETSCRAPE_API_KEY');
   if (!apiKey) {
-    return [["❌ Error: API key not configured. Run Setup/Reset from menu."]];
+    return [["❌ Error: API key not configured. Please use SheetScrape > Set API Key."]];
   }
 
   // Convert range to array and extract non-empty selectors
@@ -399,10 +441,10 @@ function SCRAPE(url, selectors_range) {
     return [["❌ Error: No valid selectors found in range"]];
   }
 
-  // Limit selectors to prevent timeout (max 30 for full coverage of standard headers)
-  if (selectors.length > 30) {
-    console.warn(`Too many selectors (${selectors.length}), limiting to first 30 to prevent timeout`);
-    selectors = selectors.slice(0, 30);
+  // Limit selectors to prevent timeout (max 32 for full coverage of standard headers)
+  if (selectors.length > 32) {
+    console.warn(`Too many selectors (${selectors.length}), limiting to first 32 to prevent timeout`);
+    selectors = selectors.slice(0, 32);
   }
 
   try {
@@ -463,6 +505,9 @@ function testScrapeFunction() {
   const testUrl = "https://www.amazon.com/dp/B09G9FPGTN";
   const testSelectors = [["title", "sale_price", "rating"]];
   
+  // For testing, you might need to temporarily set a user property if not done via UI
+  // PropertiesService.getUserProperties().setProperty('SHEETSCRAPE_API_KEY', 'YOUR_TEST_API_KEY');
+
   const result = SCRAPE(testUrl, testSelectors);
   console.log("Test result:", result);
   return result;
@@ -472,8 +517,8 @@ function testScrapeFunction() {
  * Utility function to clear all SheetScrape settings (for debugging)
  */
 function clearSheetScrapeSettings() {
-  PropertiesService.getDocumentProperties().deleteProperty('SHEETSCRAPE_API_KEY');
-  SpreadsheetApp.getUi().alert('✅ SheetScrape settings cleared');
+  PropertiesService.getUserProperties().deleteProperty('SHEETSCRAPE_API_KEY');
+  SpreadsheetApp.getUi().alert('✅ SheetScrape user settings (API Key) cleared');
 }
 
 /**
@@ -508,7 +553,7 @@ function SCRAPE_BASIC(url) {
     return result; // Return error as-is
   }
   
-  // Map the result to match STANDARD_HEADERS order (28 columns + 1 blank)
+  // Map the result to match STANDARD_HEADERS order (31 columns + 1 blank)
   const mappedResult = new Array(STANDARD_HEADERS.length).fill('');
   const data = result[0]; // SCRAPE returns array of arrays
   
@@ -535,7 +580,7 @@ function SCRAPE_BASIC(url) {
 
 /**
  * Medium scraping function with important selectors (optimized for 30-second limit)
- * Returns data in STANDARD_HEADERS order: Title, BP1-6, Description, Image 1-5 (13 fields)
+ * Returns data in STANDARD_HEADERS order: Title, BP1-6, Description, Image 1-9 (16 fields)
  * 
  * @param {string} url - The URL to scrape
  * @return {Array} Array of scraped data for important fields
@@ -545,7 +590,8 @@ function SCRAPE_MEDIUM(url) {
   // Get the medium data using SCRAPE
   const mediumSelectors = [
     'title', 'bullet_point_1', 'bullet_point_2', 'bullet_point_3', 'bullet_point_4', 'bullet_point_5', 'bullet_point_6',
-    'description', 'image_1_source', 'image_2_source', 'image_3_source', 'image_4_source', 'image_5_source'
+    'description', 'image_1_source', 'image_2_source', 'image_3_source', 'image_4_source', 'image_5_source', 
+    'image_6_source', 'image_7_source', 'image_8_source', 'image_9_source'
   ];
   const result = SCRAPE(url, [mediumSelectors]);
   
@@ -553,7 +599,7 @@ function SCRAPE_MEDIUM(url) {
     return result; // Return error as-is
   }
   
-  // Map the result to match STANDARD_HEADERS order (28 columns + 1 blank)
+  // Map the result to match STANDARD_HEADERS order (31 columns + 1 blank)
   const mappedResult = new Array(STANDARD_HEADERS.length).fill('');
   const data = result[0]; // SCRAPE returns array of arrays
   
@@ -571,7 +617,11 @@ function SCRAPE_MEDIUM(url) {
     9: 21,  // image_2_source -> image_2_source (position 21)
     10: 22, // image_3_source -> image_3_source (position 22)
     11: 23, // image_4_source -> image_4_source (position 23)
-    12: 24  // image_5_source -> image_5_source (position 24)
+    12: 24, // image_5_source -> image_5_source (position 24)
+    13: 25, // image_6_source -> image_6_source (position 25)
+    14: 26, // image_7_source -> image_7_source (position 26)
+    15: 27, // image_8_source -> image_8_source (position 27)
+    16: 28  // image_9_source -> image_9_source (position 28)
   };
   
   for (let i = 0; i < data.length; i++) {
@@ -584,7 +634,7 @@ function SCRAPE_MEDIUM(url) {
 }
 
 /**
- * Manually reset headers to the standard 28-column layout
+ * Manually reset headers to the standard 31-column layout
  * Call this function manually if you want to reset headers after customizing them
  */
 function resetToStandardHeaders() {

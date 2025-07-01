@@ -10,7 +10,7 @@
   },
   "webapp": {
     "access": "ANYONE_ANONYMOUS",
-    "executeAs": "USER_DEPLOYING"
+    "executeAs": "USER_ACCESSING"
   },
   "sheets": {
     "macros": [
@@ -23,6 +23,94 @@
   "oauthScopes": [
     "https://www.googleapis.com/auth/spreadsheets.currentonly",
     "https://www.googleapis.com/auth/script.external_request",
-    "https://www.googleapis.com/auth/script.scriptapp"
+    "https://www.googleapis.com/auth/script.scriptapp",
+    "https://www.googleapis.com/auth/userinfo.email"
+  ],
+  "addOns": {
+    "common": {
+      "name": "SheetScrape",
+      "logoUrl": "https://www.example.com/logos/sheetscrape_logo_32x32.png",
+      "layoutProperties": {
+        "primaryColor": "#4285F4",
+        "secondaryColor": "#E8F0FE"
+      },
+      "useLocaleFromApp": true,
+      "homepageTrigger": {
+        "runFunction": "onHomepage" 
+      },
+      "universalActions": [
+        {
+          "label": "Help & Documentation",
+          "runFunction": "showHelp"
+        },
+        {
+          "label": "Set API Key",
+          "runFunction": "showApiKeyPrompt"
+        },
+        {
+          "label": "View Account Info",
+          "runFunction": "showAccountInfo"
+        }
+      ]
+    },
+    "sheets": {
+      "homepageTrigger": {
+        "runFunction": "onOpen" 
+      },
+      "onFileScopeGrantedTrigger": {
+        "runFunction": "onFileScopeGranted"
+      },
+      "customFunctions": [
+        {
+          "name": "SCRAPE",
+          "description": "Scrapes web data based on URL and specified selectors.",
+          "parameters": [
+            {
+              "name": "url",
+              "description": "The web page URL to scrape."
+            },
+            {
+              "name": "selectors_range",
+              "description": "A horizontal range of cells containing the desired data selectors."
+            }
+          ],
+          "result": {
+            "type": "STRING",
+            "dimensionality": "TWO_DIMENSIONAL"
+          }
+        },
+        {
+          "name": "SCRAPE_BASIC",
+          "description": "Performs a fast scrape with essential selectors (title, key bullet points, description, main image).",
+           "parameters": [
+            {
+              "name": "url",
+              "description": "The web page URL to scrape."
+            }
+          ],
+          "result": {
+            "type": "STRING",
+            "dimensionality": "TWO_DIMENSIONAL"
+          }
+        },
+        {
+          "name": "SCRAPE_MEDIUM",
+          "description": "Performs a medium scrape with important selectors (title, bullet points 1-6, description, images 1-9).",
+          "parameters": [
+            {
+              "name": "url",
+              "description": "The web page URL to scrape."
+            }
+          ],
+          "result": {
+            "type": "STRING",
+            "dimensionality": "TWO_DIMENSIONAL"
+          }
+        }
+      ]
+    }
+  },
+  "urlFetchWhitelist": [
+    "https://sheetscrape-api.onrender.com/"
   ]
 } 
